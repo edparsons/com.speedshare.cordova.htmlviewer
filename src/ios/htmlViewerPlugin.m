@@ -6,10 +6,11 @@
 //
 
 #import "htmlViewerPlugin.h"
+#import <WebKit/WebKit.h>
 
 @implementation HtmlViewerPlugin{
     NSMutableDictionary *videoState;
-    UIWebView *htmlview;
+    WKWebView *htmlview;
     CADisplayLink *displayLink;
     NSString *startHTML;
     NSDictionary *pendingDomUpdate;
@@ -27,7 +28,7 @@
     self.webView.opaque = NO;
     self.webView.backgroundColor = [UIColor clearColor];
 
-    htmlview = [[UIWebView alloc] init];
+    htmlview = [[WKWebView alloc] init];
     
     htmlview.frame = CGRectMake(0, 0, 0, 0);
     
@@ -36,8 +37,8 @@
  
     htmlview.hidden = YES;
 
-    displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(animationTick)];
-    displayLink.paused = YES;
+    //displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(animationTick)];
+    //displayLink.paused = YES;
     
     NSError *error;
     NSString *filePath = [[NSBundle mainBundle] pathForResource:@"mirror" ofType:@"html"];
@@ -53,8 +54,8 @@
 - (void)onResume:(NSNotification *) notification {
 }
 - (void)animationTick {
-    htmlview.frame = CGRectMake(htmlview.frame.origin.x, htmlview.frame.origin.y, htmlview.frame.size.width, htmlview.frame.size.height);
-    displayLink.paused = YES;
+    //htmlview.frame = CGRectMake(htmlview.frame.origin.x, htmlview.frame.origin.y, htmlview.frame.size.width, htmlview.frame.size.height);
+    //displayLink.paused = YES;
 }
 
 #pragma mark -
@@ -79,7 +80,7 @@
     htmlview.clipsToBounds = YES;
     htmlview.multipleTouchEnabled = NO;
     htmlview.opaque = YES;
-    htmlview.scalesPageToFit = NO;
+    //htmlview.scalesPageToFit = NO;
     htmlview.userInteractionEnabled = YES;
 
     [self updateHTML:command];
@@ -112,11 +113,26 @@
 }
 
 - (void)updateHTML:(CDVInvokedUrlCommand*)command {
+
     NSString* base = [command.arguments objectAtIndex:0];
     pendingDomUpdate = [command.arguments objectAtIndex:1];
 
-    [htmlview loadHTMLString:startHTML baseURL:[NSURL URLWithString:@"https://"]];
-    
+    NSURL *url;
+    if ([base hasPrefix:@"http://"]) {
+       url = [NSURL URLWithString:@"http://sync-trial.speedshare.com/mirror.html"];
+    } else {
+       url = [NSURL URLWithString:@"https://sync-trial.speedshare.com/mirror.html"];
+    }
+
+    NSURLRequest *request = [NSURLRequest requestWithURL:url];
+    [htmlview loadRequest:request];
+
+//   if ([base hasPrefix:@"http://"]) {
+//       [htmlview loadHTMLString:startHTML baseURL:[NSURL URLWithString:@"http://"]];
+//   } else {
+//       [htmlview loadHTMLString:startHTML baseURL:[NSURL URLWithString:@"https://"]];
+ //  }
+
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
@@ -128,7 +144,17 @@
         jsonData = [NSJSONSerialization dataWithJSONObject:pendingDomUpdate options:0 error:nil];
         jsonString = [[NSString alloc] initWithBytes:[jsonData bytes] length:[jsonData length] encoding:NSUTF8StringEncoding];
         
-        [htmlview stringByEvaluatingJavaScriptFromString:[NSString stringWithFormat:@"onMessage(%@)", jsonString]];
+        //[htmlview stringByEvaluatingJavaScriptFromString:[NSString stringWithFormat:@"onMessage(%@)", jsonString]];
+        [htmlview evaluateJavaScript:[NSString stringWithFormat:@"onMessage(%@)", jsonString] completionHandler:^(id result, NSError *error) {
+            if (error == nil) {
+                if (result != nil) {
+                    NSLog(@"evaluateJavaScript : %@", [NSString stringWithFormat:@"%@", result]);
+                }
+            } else {
+                NSLog(@"evaluateJavaScript error : %@", error.localizedDescription);
+            }
+        }];
+
         
         pendingDomUpdate = nil;
     }
@@ -137,7 +163,15 @@
     jsonData = [NSJSONSerialization dataWithJSONObject:domUpdate options:0 error:nil];
     jsonString = [[NSString alloc] initWithBytes:[jsonData bytes] length:[jsonData length] encoding:NSUTF8StringEncoding];
     
-    [htmlview stringByEvaluatingJavaScriptFromString:[NSString stringWithFormat:@"onMessage(%@)", jsonString]];
+    [htmlview evaluateJavaScript:[NSString stringWithFormat:@"onMessage(%@)", jsonString] completionHandler:^(id result, NSError *error) {
+        if (error == nil) {
+            if (result != nil) {
+                NSLog(@"evaluateJavaScript : %@", [NSString stringWithFormat:@"%@", result]);
+            }
+        } else {
+            NSLog(@"evaluateJavaScript error : %@", error.localizedDescription);
+        }
+    }];
     
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
@@ -154,7 +188,15 @@
 - (void)sendScroll:(CDVInvokedUrlCommand*)command {
     int top = [[command.arguments objectAtIndex:0] intValue];
 
-    [htmlview stringByEvaluatingJavaScriptFromString:[NSString stringWithFormat:@"window.scrollTo(0, %d);", top]];
+    [htmlview evaluateJavaScript:[NSString stringWithFormat:@"window.scrollTo(0, %d);", top] completionHandler:^(id result, NSError *error) {
+        if (error == nil) {
+            if (result != nil) {
+                NSLog(@"evaluateJavaScript : %@", [NSString stringWithFormat:@"%@", result]);
+            }
+        } else {
+            NSLog(@"evaluateJavaScript error : %@", error.localizedDescription);
+        }
+    }];
 
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
