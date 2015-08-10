@@ -13,6 +13,7 @@
     WKWebView *htmlview;
     CADisplayLink *displayLink;
     NSString *startHTML;
+    NSString *env;
     NSDictionary *pendingDomUpdate;
 }
 
@@ -30,9 +31,12 @@
 
     htmlview = [[WKWebView alloc] init];
     
+    env = @"sync-trial.speedshare.com";
+    
     htmlview.frame = CGRectMake(0, 0, 0, 0);
     
     [self.webView.superview insertSubview:htmlview atIndex:0];
+    self.webView.keyboardDisplayRequiresUserAction = false;
 //    [self.webView.superview addSubview:htmlview];
  
     htmlview.hidden = YES;
@@ -46,7 +50,7 @@
     pendingDomUpdate = nil;
     
     self.webView.layer.zPosition = 4;
-    htmlview.layer.zPosition = 2;
+    htmlview.layer.zPosition = 1;
 }
 
 - (void)onSuspend:(NSNotification *) notification {
@@ -69,6 +73,7 @@
     int left = [[command.arguments objectAtIndex:3] intValue];
     int width = [[command.arguments objectAtIndex:4] intValue];
     int height = [[command.arguments objectAtIndex:5] intValue];
+    env = [command.arguments objectAtIndex:6];
     
     htmlview.frame = CGRectMake(left, top, width, height);
 
@@ -119,9 +124,9 @@
 
     NSURL *url;
     if ([base hasPrefix:@"http://"]) {
-       url = [NSURL URLWithString:@"http://sync-trial.speedshare.com/mirror.html"];
+       url = [NSURL URLWithString:[NSString stringWithFormat:@"http://%@/mirror.html", env]];
     } else {
-       url = [NSURL URLWithString:@"https://sync-trial.speedshare.com/mirror.html"];
+       url = [NSURL URLWithString:[NSString stringWithFormat:@"https://%@/mirror.html", env]];
     }
 
     NSURLRequest *request = [NSURLRequest requestWithURL:url];

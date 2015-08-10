@@ -12,16 +12,16 @@ window.SSHtmlViewer = {
   canvastop:98,
   scale:1,
 
-  startSession: function(msg, cb) {
+  startSession: function(msg, env, cb) {
     var top = (SSHtmlViewer.top - SSHtmlViewer.scrolltop) * SSHtmlViewer.scale + SSHtmlViewer.localscrolltop + SSHtmlViewer.canvastop;
     var left = (SSHtmlViewer.left - SSHtmlViewer.scrollleft) * SSHtmlViewer.scale + SSHtmlViewer.localscrollleft + SSHtmlViewer.canvasleft;
     var width = SSHtmlViewer.width * SSHtmlViewer.scale;
     var height = SSHtmlViewer.height * SSHtmlViewer.scale;
 
     if (cb) {
-      Cordova.exec(cb, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [msg.base, msg, top, left, width, height]);
+      Cordova.exec(cb, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [msg.base, msg, top, left, width, height, env]);
     } else {
-      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [msg.base, msg, top, left, width, height]);
+      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [msg.base, msg, top, left, width, height, env]);
     }
     var ele = document.body;
     ele.className = ele.className.trim() + ' transparent';
@@ -72,8 +72,10 @@ window.SSHtmlViewer = {
   attachListeners: function(speedshare) {
     speedshare.on('remote#dom', function(type, data){
       //SSHtmlViewer.height = data.height;
+      console.log(data);
       if (!SSHtmlViewer.browserStart) {
-        window.SSHtmlViewer.startSession(data.html);
+        var env = localStorage.envSync.replace('https://', '').replace('http://', '');
+        window.SSHtmlViewer.startSession(data.html, env);
       } else {
         window.SSHtmlViewer.updateHTML(data.html);
       }

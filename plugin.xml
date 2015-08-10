@@ -18,6 +18,8 @@
       <header-file src="src/ios/htmlViewerPlugin.h" />
       <source-file src="src/ios/htmlViewerPlugin.m" />
 
+      <framework src="WebKit.framework" />
+
       <!-- Adopts project's config.xml to include the SpeedshareCordovaPlugin and domain whitelists -->
 
       <config-file target="config.xml" parent="/*">
