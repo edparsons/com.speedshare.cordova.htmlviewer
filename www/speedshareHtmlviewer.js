@@ -63,6 +63,9 @@ window.SSHtmlViewer = {
       Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateDOM', [msg]);
     }
   },
+  checkElement: function(x,y,cb) {
+    Cordova.exec(cb, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'checkElement', [x,y]);
+  },
   SSHTMLSuccess: function(data) {
     console.log('SSHTMLSuccess', data);
   },
@@ -72,7 +75,7 @@ window.SSHtmlViewer = {
   attachListeners: function(speedshare) {
     speedshare.on('remote#dom', function(type, data){
       //SSHtmlViewer.height = data.height;
-      console.log(data);
+      debugger;
       if (!SSHtmlViewer.browserStart) {
         var env = localStorage.envSync.replace('https://', '').replace('http://', '');
         window.SSHtmlViewer.startSession(data.html, env);

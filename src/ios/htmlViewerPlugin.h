@@ -6,8 +6,9 @@
 //
 
 #import <Cordova/CDVPlugin.h>
+#import <WebKit/WebKit.h>
 
-@interface HtmlViewerPlugin : CDVPlugin
+@interface HtmlViewerPlugin : CDVPlugin <WKNavigationDelegate, WKScriptMessageHandler>
 
 
 - (void)startSession:(CDVInvokedUrlCommand*)command;
@@ -18,5 +19,6 @@
 - (void)bringToFront:(CDVInvokedUrlCommand*)command;
 - (void)sendToBack:(CDVInvokedUrlCommand*)command;
 - (void)sendScroll:(CDVInvokedUrlCommand*)command;
+- (void)checkElement:(CDVInvokedUrlCommand*)command;
 
 @end

@@ -6,7 +6,6 @@
 //
 
 #import "htmlViewerPlugin.h"
-#import <WebKit/WebKit.h>
 
 @implementation HtmlViewerPlugin{
     NSMutableDictionary *videoState;
@@ -14,7 +13,9 @@
     CADisplayLink *displayLink;
     NSString *startHTML;
     NSString *env;
-    NSDictionary *pendingDomUpdate;
+    //NSDictionary *pendingDomUpdate;
+    NSMutableArray *pendingDomUpdates;
+    bool loading;
 }
 
 #pragma mark -
@@ -29,11 +30,16 @@
     self.webView.opaque = NO;
     self.webView.backgroundColor = [UIColor clearColor];
 
-    htmlview = [[WKWebView alloc] init];
+    WKWebViewConfiguration *theConfiguration = [[WKWebViewConfiguration alloc] init];
+    [theConfiguration.userContentController addScriptMessageHandler:self name:@"speedshare"];
+    
+    htmlview = [[WKWebView alloc] initWithFrame:CGRectMake(0, 0, 0, 0) configuration:theConfiguration];
     
     env = @"sync-trial.speedshare.com";
     
-    htmlview.frame = CGRectMake(0, 0, 0, 0);
+    htmlview.navigationDelegate = self;
+    
+    loading = false;
     
     [self.webView.superview insertSubview:htmlview atIndex:0];
     self.webView.keyboardDisplayRequiresUserAction = false;
@@ -47,10 +53,24 @@
     NSError *error;
     NSString *filePath = [[NSBundle mainBundle] pathForResource:@"mirror" ofType:@"html"];
     startHTML = [NSString stringWithContentsOfFile:filePath encoding:NSASCIIStringEncoding error:&error];
-    pendingDomUpdate = nil;
+    pendingDomUpdates = [NSMutableArray array];
     
     self.webView.layer.zPosition = 4;
     htmlview.layer.zPosition = 1;
+}
+
+- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
+   loading = false;
+   [self runDomUpdates];
+}
+
+- (void)userContentController:(WKUserContentController *)userContentController
+                            didReceiveScriptMessage:(WKScriptMessage *)message{
+//    NSDictionary *sentData = (NSDictionary*)message.body;
+//    long aCount = [sentData[@"count"] integerValue];
+//    aCount++;
+//    [_theWebView evaluateJavaScript:[NSString
+//            stringWithFormat:@"storeAndShow(%ld)", aCount] completionHandler:nil];
 }
 
 - (void)onSuspend:(NSNotification *) notification {
@@ -117,10 +137,10 @@
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)updateHTML:(CDVInvokedUrlCommand*)command {
 
+- (void)updateHTML:(CDVInvokedUrlCommand*)command {
     NSString* base = [command.arguments objectAtIndex:0];
-    pendingDomUpdate = [command.arguments objectAtIndex:1];
+    [pendingDomUpdates addObject:[command.arguments objectAtIndex:1]];
 
     NSURL *url;
     if ([base hasPrefix:@"http://"]) {
@@ -131,55 +151,44 @@
 
     NSURLRequest *request = [NSURLRequest requestWithURL:url];
     [htmlview loadRequest:request];
-
-//   if ([base hasPrefix:@"http://"]) {
-//       [htmlview loadHTMLString:startHTML baseURL:[NSURL URLWithString:@"http://"]];
-//   } else {
-//       [htmlview loadHTMLString:startHTML baseURL:[NSURL URLWithString:@"https://"]];
- //  }
+    loading = true;
 
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
 - (void)updateDOM:(CDVInvokedUrlCommand*)command {
-    NSData* jsonData;
-    NSString* jsonString;
-    if (pendingDomUpdate != nil) {
-        jsonData = [NSJSONSerialization dataWithJSONObject:pendingDomUpdate options:0 error:nil];
-        jsonString = [[NSString alloc] initWithBytes:[jsonData bytes] length:[jsonData length] encoding:NSUTF8StringEncoding];
-        
-        //[htmlview stringByEvaluatingJavaScriptFromString:[NSString stringWithFormat:@"onMessage(%@)", jsonString]];
-        [htmlview evaluateJavaScript:[NSString stringWithFormat:@"onMessage(%@)", jsonString] completionHandler:^(id result, NSError *error) {
-            if (error == nil) {
-                if (result != nil) {
-                    NSLog(@"evaluateJavaScript : %@", [NSString stringWithFormat:@"%@", result]);
-                }
-            } else {
-                NSLog(@"evaluateJavaScript error : %@", error.localizedDescription);
-            }
-        }];
-
-        
-        pendingDomUpdate = nil;
+    [pendingDomUpdates addObject:[command.arguments objectAtIndex:0]];
+    if (!loading) {
+        [self runDomUpdates];
     }
-    NSString* domUpdate = [command.arguments objectAtIndex:0];
-    
-    jsonData = [NSJSONSerialization dataWithJSONObject:domUpdate options:0 error:nil];
-    jsonString = [[NSString alloc] initWithBytes:[jsonData bytes] length:[jsonData length] encoding:NSUTF8StringEncoding];
-    
-    [htmlview evaluateJavaScript:[NSString stringWithFormat:@"onMessage(%@)", jsonString] completionHandler:^(id result, NSError *error) {
-        if (error == nil) {
-            if (result != nil) {
-                NSLog(@"evaluateJavaScript : %@", [NSString stringWithFormat:@"%@", result]);
-            }
-        } else {
-            NSLog(@"evaluateJavaScript error : %@", error.localizedDescription);
-        }
-    }];
     
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
+- (void)runDomUpdates {
+    NSData* jsonData;
+    NSString* jsonString;
+
+    while ([pendingDomUpdates count] > 0) {
+        NSDictionary *domUpdate = [pendingDomUpdates objectAtIndex:0];
+        jsonData = [NSJSONSerialization dataWithJSONObject:domUpdate options:0 error:nil];
+        jsonString = [[NSString alloc] initWithBytes:[jsonData bytes] length:[jsonData length] encoding:NSUTF8StringEncoding];
+    
+        [htmlview evaluateJavaScript:[NSString stringWithFormat:@"onMessage(%@)", jsonString] completionHandler:^(id result, NSError *error) {
+            if (error == nil) {
+                if (result != nil) {
+                    NSLog(@"updateDom evaluateJavaScript : %@", [NSString stringWithFormat:@"%@", result]);
+                } else {
+                    NSLog(@"updateDom evaluateJavaScript no result");
+                }
+            } else {
+                NSLog(@"updateDom evaluateJavaScript error : %@", error.localizedDescription);
+            }
+        }];
+        [pendingDomUpdates removeObjectAtIndex:0];
+    }
 }
 
 - (void)bringToFront:(CDVInvokedUrlCommand*)command {
@@ -190,16 +199,41 @@
     [self.webView.superview sendSubviewToBack:htmlview];
 }
 
+- (void)checkElement:(CDVInvokedUrlCommand*)command {
+    int left = [[command.arguments objectAtIndex:0] intValue];
+    int top = [[command.arguments objectAtIndex:1] intValue];
+
+    [htmlview evaluateJavaScript:[NSString stringWithFormat:@"window.document.elementFromPoint(%d, %d).tagName;", left, top] completionHandler:^(id result, NSError *error) {
+        if (error == nil) {
+            if (result != nil) {
+                NSMutableDictionary* payload = [[NSMutableDictionary alloc] init];
+                [payload setObject:result forKey:@"elem"];
+                CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:payload];
+                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+                NSLog(@"evaluateJavaScript : %@", [NSString stringWithFormat:@"%@", result]);
+            } else {
+                CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
+                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            }
+        } else {
+            CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
+            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            NSLog(@"evaluateJavaScript error : %@", error.localizedDescription);
+        }
+    }];
+
+}
+
 - (void)sendScroll:(CDVInvokedUrlCommand*)command {
     int top = [[command.arguments objectAtIndex:0] intValue];
 
     [htmlview evaluateJavaScript:[NSString stringWithFormat:@"window.scrollTo(0, %d);", top] completionHandler:^(id result, NSError *error) {
         if (error == nil) {
             if (result != nil) {
-                NSLog(@"evaluateJavaScript : %@", [NSString stringWithFormat:@"%@", result]);
+                NSLog(@"sendScroll evaluateJavaScript : %@", [NSString stringWithFormat:@"%@", result]);
             }
         } else {
-            NSLog(@"evaluateJavaScript error : %@", error.localizedDescription);
+            NSLog(@"sendScroll evaluateJavaScript error : %@", error.localizedDescription);
         }
     }];
 
