@@ -140,6 +140,7 @@
 
 - (void)updateHTML:(CDVInvokedUrlCommand*)command {
     NSString* base = [command.arguments objectAtIndex:0];
+    [pendingDomUpdates removeAllObjects];
     [pendingDomUpdates addObject:[command.arguments objectAtIndex:1]];
 
     NSURL *url;
