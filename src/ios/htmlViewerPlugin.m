@@ -16,6 +16,11 @@
     //NSDictionary *pendingDomUpdate;
     NSMutableArray *pendingDomUpdates;
     bool loading;
+    float zoom;
+    int panX;
+    int panY;
+    int height;
+    int width;
 }
 
 #pragma mark -
@@ -112,7 +117,7 @@
 }
 
 -(void)stopSession:(CDVInvokedUrlCommand*)command{
-    [htmlview loadHTMLString:startHTML baseURL:[NSURL URLWithString:@"https://"]];
+    [htmlview loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:@"about:blank"]]];
 
     htmlview.hidden = YES;
     
@@ -142,6 +147,15 @@
     NSString* base = [command.arguments objectAtIndex:0];
     [pendingDomUpdates removeAllObjects];
     [pendingDomUpdates addObject:[command.arguments objectAtIndex:1]];
+
+
+    zoom = 1.0f;
+    panX = 0;
+    panY = 0;
+    height = 0;
+    width = 0;
+
+    NSLog(@"%@", [pendingDomUpdates objectAtIndex:0]);
 
     NSURL *url;
     if ([base hasPrefix:@"http://"]) {
@@ -177,17 +191,8 @@
         jsonData = [NSJSONSerialization dataWithJSONObject:domUpdate options:0 error:nil];
         jsonString = [[NSString alloc] initWithBytes:[jsonData bytes] length:[jsonData length] encoding:NSUTF8StringEncoding];
     
-        [htmlview evaluateJavaScript:[NSString stringWithFormat:@"onMessage(%@)", jsonString] completionHandler:^(id result, NSError *error) {
-            if (error == nil) {
-                if (result != nil) {
-                    NSLog(@"updateDom evaluateJavaScript : %@", [NSString stringWithFormat:@"%@", result]);
-                } else {
-                    NSLog(@"updateDom evaluateJavaScript no result");
-                }
-            } else {
-                NSLog(@"updateDom evaluateJavaScript error : %@", error.localizedDescription);
-            }
-        }];
+        [self sendJavascript:[NSString stringWithFormat:@"onMessage(%@)", jsonString] withLogMsg:@"updateDom"];
+
         [pendingDomUpdates removeObjectAtIndex:0];
     }
 }
@@ -228,20 +233,36 @@
 - (void)sendScroll:(CDVInvokedUrlCommand*)command {
     int top = [[command.arguments objectAtIndex:0] intValue];
 
-    [htmlview evaluateJavaScript:[NSString stringWithFormat:@"window.scrollTo(0, %d);", top] completionHandler:^(id result, NSError *error) {
-        if (error == nil) {
-            if (result != nil) {
-                NSLog(@"sendScroll evaluateJavaScript : %@", [NSString stringWithFormat:@"%@", result]);
-            }
-        } else {
-            NSLog(@"sendScroll evaluateJavaScript error : %@", error.localizedDescription);
-        }
-    }];
+    [self sendJavascript:[NSString stringWithFormat:@"window.scrollTo(0, %d);", top] withLogMsg:@"scroll"];
 
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
+- (void)setZoom:(CDVInvokedUrlCommand*)command {
+    zoom = [[command.arguments objectAtIndex:0] floatValue];
+
+    [self updateInnerView];
+
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
+- (void)updateInnerView {
+    [self sendJavascript:[NSString stringWithFormat:@"document.documentElement.style.webkitTransform = 'scale(%f, %f) translate3d(%d, %d, 0)';", zoom, zoom, panX, panY] withLogMsg:@"updateView"];
+}
+
+- (void)sendJavascript:(NSString*)command withLogMsg:(NSString *)msg {
+    [htmlview evaluateJavaScript:command completionHandler:^(id result, NSError *error) {
+        if (error == nil) {
+            if (result != nil) {
+                NSLog(@"%@ evaluateJavaScript : %@", msg, [NSString stringWithFormat:@"%@", result]);
+            }
+        } else {
+            NSLog(@"%@ evaluateJavaScript error : %@", msg, error.localizedDescription);
+        }
+    }];
+}
 
 @end
 

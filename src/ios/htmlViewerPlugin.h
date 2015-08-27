@@ -20,5 +20,6 @@
 - (void)sendToBack:(CDVInvokedUrlCommand*)command;
 - (void)sendScroll:(CDVInvokedUrlCommand*)command;
 - (void)checkElement:(CDVInvokedUrlCommand*)command;
+- (void)setZoom:(CDVInvokedUrlCommand*)command;
 
 @end
