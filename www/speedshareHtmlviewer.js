@@ -11,6 +11,9 @@ window.SSHtmlViewer = {
   canvasleft:0,
   canvastop:98,
   scale:1,
+  internalScrollX: 0,
+  internalScrollY: 0,
+  internalScale: 1,
 
   startSession: function(msg, env, cb) {
     var top = (SSHtmlViewer.top - SSHtmlViewer.scrolltop) * SSHtmlViewer.scale + SSHtmlViewer.localscrolltop + SSHtmlViewer.canvastop;
@@ -62,6 +65,11 @@ window.SSHtmlViewer = {
       Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateView', [top, left, width, height]);
     }
   },
+  updateInternalView: function() {
+    if (SSHtmlViewer.browserStart) {
+      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateInternalView', [(SSHtmlViewer.internalScrollX / SSHtmlViewer.internalScale), (SSHtmlViewer.internalScrollY / SSHtmlViewer.internalScale), SSHtmlViewer.internalScale]);
+    }    
+  },
   updateHTML: function(msg) {
     if (SSHtmlViewer.browserStart) {
       if (msg.base) {
@@ -76,8 +84,13 @@ window.SSHtmlViewer = {
       Cordova.exec(cb, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'checkElement', [x,y]);
     }
   },
+  startLoading: function(cb) {
+    if (SSHtmlViewer.browserStart) {
+      Cordova.exec(cb, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startLoading', []);
+    }
+  },
   SSHTMLSuccess: function(data) {
-    console.log('SSHTMLSuccess', data);
+    //console.log('SSHTMLSuccess', data);
   },
   SSHTMLError: function(data) {
     console.log('SSHTMLError', data);
@@ -89,6 +102,7 @@ window.SSHtmlViewer = {
       if (!SSHtmlViewer.browserStart) {
         var env = localStorage.envSync.replace('https://', '').replace('http://', '');
         window.SSHtmlViewer.startSession(data.html, env);
+        window.SSHtmlViewer.startLoading();
       } else {
         window.SSHtmlViewer.updateHTML(data.html);
       }
@@ -97,13 +111,21 @@ window.SSHtmlViewer = {
       SSHtmlViewer.localscrolltop = data.top;
       window.SSHtmlViewer.updateView();
     });
+    speedshare.on('tabs#loading', function(type, data){
+      window.SSHtmlViewer.startLoading();
+    });
+
     speedshare.on('canvas#resize', function(type, data){
       console.log('canvas#resize', data);
       // the plus 64 is to account for the 20px iOS status bar and the 44px header above the video
-      SSHtmlViewer.scale = data.scale;
+      SSHtmlViewer.scale = data.initScale;
       SSHtmlViewer.width = data.width;
       SSHtmlViewer.height = data.height;
+      SSHtmlViewer.internalScrollX = data.internalScrollX;
+      SSHtmlViewer.internalScrollY = data.internalScrollY;
+      SSHtmlViewer.internalScale = data.scale;
       window.SSHtmlViewer.updateView();
+      window.SSHtmlViewer.updateInternalView();
     });
     speedshare.on('window#scrolling', function(type, data){
       SSHtmlViewer.scrolltop = data.y;

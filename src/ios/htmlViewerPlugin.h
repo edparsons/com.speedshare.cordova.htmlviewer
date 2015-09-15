@@ -16,9 +16,11 @@
 - (void)updateView:(CDVInvokedUrlCommand*)command;
 - (void)updateDOM:(CDVInvokedUrlCommand*)command;
 - (void)updateHTML:(CDVInvokedUrlCommand*)command;
+- (void)updateInternalView:(CDVInvokedUrlCommand*)command;
 - (void)bringToFront:(CDVInvokedUrlCommand*)command;
 - (void)sendToBack:(CDVInvokedUrlCommand*)command;
 - (void)sendScroll:(CDVInvokedUrlCommand*)command;
 - (void)checkElement:(CDVInvokedUrlCommand*)command;
+- (void)startLoading:(CDVInvokedUrlCommand*)command;
 
 @end

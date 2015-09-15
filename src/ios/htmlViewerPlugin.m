@@ -61,6 +61,7 @@
 
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
    loading = false;
+    [self runJavascript:@"document.documentElement.style.webkitTransformOrigin = '0 0 0';" withTitle:@"setTransformOrigin"];
    [self runDomUpdates];
 }
 
@@ -133,6 +134,19 @@
         [htmlview setNeedsDisplay];
     }
     
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
+- (void)updateInternalView:(CDVInvokedUrlCommand*)command {
+    int scrollX = [[command.arguments objectAtIndex:0] intValue];
+    int scrollY = [[command.arguments objectAtIndex:1] intValue];
+    float scale = [[command.arguments objectAtIndex:2] intValue];
+
+    if (!loading) {
+        [self runJavascript:[NSString stringWithFormat:@"document.documentElement.style.webkitTransform = 'scale3d(%f, %f, 1) translate3d(%dpx, %dpx, 0px)';", scale, scale, scrollY, scrollX]  withTitle:@"setTransform"];
+    }
+
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
@@ -225,21 +239,34 @@
 
 }
 
-- (void)sendScroll:(CDVInvokedUrlCommand*)command {
-    int top = [[command.arguments objectAtIndex:0] intValue];
+- (void)startLoading:(CDVInvokedUrlCommand*)command {
 
-    [htmlview evaluateJavaScript:[NSString stringWithFormat:@"window.scrollTo(0, %d);", top] completionHandler:^(id result, NSError *error) {
-        if (error == nil) {
-            if (result != nil) {
-                NSLog(@"sendScroll evaluateJavaScript : %@", [NSString stringWithFormat:@"%@", result]);
-            }
-        } else {
-            NSLog(@"sendScroll evaluateJavaScript error : %@", error.localizedDescription);
-        }
-    }];
+    [self runJavascript:@"preloadProgress();" withTitle:@"startLoading"];
 
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
+- (void)sendScroll:(CDVInvokedUrlCommand*)command {
+    int top = [[command.arguments objectAtIndex:0] intValue];
+    
+    [self runJavascript:[NSString stringWithFormat:@"window.scrollTo(0, %d);", top] withTitle:@"sendScroll"];
+
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
+- (void)runJavascript:(NSString *)javascript withTitle:(NSString *)title {
+    [htmlview evaluateJavaScript:javascript completionHandler:^(id result, NSError *error) {
+        if (error == nil) {
+            if (result != nil) {
+                NSLog(@"%@ evaluateJavaScript : %@", title, [NSString stringWithFormat:@"%@", result]);
+            }
+        } else {
+            NSLog(@"%@ evaluateJavaScript error : %@", title, error.localizedDescription);
+        }
+    }];
+
 }
 
 
