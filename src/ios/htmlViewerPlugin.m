@@ -16,6 +16,11 @@
     //NSDictionary *pendingDomUpdate;
     NSMutableArray *pendingDomUpdates;
     bool loading;
+    float zoom;
+    int panX;
+    int panY;
+    int height;
+    int width;
 }
 
 #pragma mark -
@@ -105,6 +110,7 @@
     htmlview.clipsToBounds = YES;
     htmlview.multipleTouchEnabled = NO;
     htmlview.opaque = YES;
+    //htmlview.scalesPageToFit = NO;
     htmlview.userInteractionEnabled = YES;
 
     [self updateHTML:command];
@@ -141,6 +147,15 @@
     NSString* base = [command.arguments objectAtIndex:0];
     [pendingDomUpdates removeAllObjects];
     [pendingDomUpdates addObject:[command.arguments objectAtIndex:1]];
+
+
+    zoom = 1.0f;
+    panX = 0;
+    panY = 0;
+    height = 0;
+    width = 0;
+
+    NSLog(@"%@", [pendingDomUpdates objectAtIndex:0]);
 
     NSURL *url;
     if ([base hasPrefix:@"http://"]) {
@@ -215,18 +230,29 @@
 
 }
 
-- (void)updateInnerView:(CDVInvokedUrlCommand*)command {
-    int scrollX = [[command.arguments objectAtIndex:0] intValue];
-    int scrollY = [[command.arguments objectAtIndex:1] intValue];
-    float zoom = [[command.arguments objectAtIndex:2] floatValue];
-    int panX = [[command.arguments objectAtIndex:3] intValue];
-    int panY = [[command.arguments objectAtIndex:4] intValue];
+- (void)sendScroll:(CDVInvokedUrlCommand*)command {
+    int top = [[command.arguments objectAtIndex:0] intValue];
 
-    [self sendJavascript:[NSString stringWithFormat:@"document.documentElement.style.webkitTransform = 'scale(%f, %f) translate3d(%d, %d, 0)'; window.scrollTo(%d, %d);", zoom, zoom, panX, panY, scrollX, scrollY] withLogMsg:@"updateView"];
+    [self sendJavascript:[NSString stringWithFormat:@"window.scrollTo(0, %d);", top] withLogMsg:@"scroll"];
+
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
+- (void)setZoom:(CDVInvokedUrlCommand*)command {
+    zoom = [[command.arguments objectAtIndex:0] floatValue];
+
+    [self updateInnerView];
+
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
+- (void)updateInnerView {
+    [self sendJavascript:[NSString stringWithFormat:@"document.documentElement.style.webkitTransform = 'scale(%f, %f) translate3d(%d, %d, 0)';", zoom, zoom, panX, panY] withLogMsg:@"updateView"];
 }
 
 - (void)sendJavascript:(NSString*)command withLogMsg:(NSString *)msg {
-    NSLog(@"%@", command);
     [htmlview evaluateJavaScript:command completionHandler:^(id result, NSError *error) {
         if (error == nil) {
             if (result != nil) {
