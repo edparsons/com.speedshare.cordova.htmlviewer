@@ -11,10 +11,6 @@ window.SSHtmlViewer = {
   canvasleft:0,
   canvastop:98,
   scale:1,
-  zoom:1,
-  startZoom:1,
-  panx:0,
-  pany:0,
 
   startSession: function(msg, env, cb) {
     var top = (SSHtmlViewer.top - SSHtmlViewer.scrolltop) * SSHtmlViewer.scale + SSHtmlViewer.localscrolltop + SSHtmlViewer.canvastop;
@@ -69,18 +65,10 @@ window.SSHtmlViewer = {
   updateHTML: function(msg) {
     if (SSHtmlViewer.browserStart) {
       if (msg.base) {
-        SSHtmlViewer.zoom = 1;
-        SSHtmlViewer.panx = 0;
-        SSHtmlViewer.pany = 0;
         Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateHTML', [msg.base, msg]);
       } else {
         Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateDOM', [msg]);
       }
-    }
-  },
-  updateInnerView: function() {
-    if (SSHtmlViewer.browserStart) {
-      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateInnerView', [SSHtmlViewer.scrollleft, SSHtmlViewer.scrolltop, SSHtmlViewer.zoom, SSHtmlViewer.panx, SSHtmlViewer.pany]);
     }
   },
   checkElement: function(x,y,cb) {
@@ -88,17 +76,11 @@ window.SSHtmlViewer = {
       Cordova.exec(cb, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'checkElement', [x,y]);
     }
   },
-  setZoom: function(zoom) {
-    if (zoom > 1) {
-      SSHtmlViewer.zoom = zoom;      
-    }
-    SSHtmlViewer.updateInnerView();
-  },
   SSHTMLSuccess: function(data) {
-    console.log('SSHtmlSuccess', data);
+    console.log('SSHTMLSuccess', data);
   },
   SSHTMLError: function(data) {
-    console.log('SSHtmlError', data);
+    console.log('SSHTMLError', data);
   },
   attachListeners: function(speedshare) {
     speedshare.on('remote#dom', function(type, data){
@@ -121,24 +103,17 @@ window.SSHtmlViewer = {
       SSHtmlViewer.scale = data.scale;
       SSHtmlViewer.width = data.width;
       SSHtmlViewer.height = data.height;
-      SSHtmlViewer.zoom = data.videoScale;
-      if (SSHtmlViewer.zoom < 1) {
-        SSHtmlViewer.zoom = 1;
-      }
-      SSHtmlViewer.updateView();
-      SSHtmlViewer.updateInnerView();
+      window.SSHtmlViewer.updateView();
     });
     speedshare.on('window#scrolling', function(type, data){
-      if (SSHtmlViewer.zoom !== 1) {
-        //SSHtmlViewer.scrolltop = data.y / SSHtmlViewer.zoom;
-        //SSHtmlViewer.scrollleft = data.x / SSHtmlViewer.zoom;
-        SSHtmlViewer.pany = data.y / SSHtmlViewer.zoom;
-        SSHtmlViewer.panx = data.x / SSHtmlViewer.zoom;
-      } else {
-        SSHtmlViewer.scrolltop = data.y;
-        SSHtmlViewer.scrollleft = data.x;
-      }
-      SSHtmlViewer.updateInnerView();
+      SSHtmlViewer.scrolltop = data.y;
+      //if (data.animate) {
+        //var top = (SSHtmlViewer.top - SSHtmlViewer.scrolltop) * SSHtmlViewer.scale + SSHtmlViewer.localscrolltop + SSHtmlViewer.canvastop;
+      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'sendScroll', [SSHtmlViewer.scrolltop]);
+      //} else {
+        //SSHtmlViewer.scrolltop = data.y;
+        //window.SSHtmlViewer.updateView();
+      //}
     });
     window.speedshare.on('connect#stop', function(type, data){
       window.SSHtmlViewer.stopSession();
