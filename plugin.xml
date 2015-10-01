@@ -30,5 +30,11 @@
       <config-file target="config.xml" parent="/*">
         <access origin="*" />
       </config-file>
+      <config-file target="*-Info.plist" parent="NSAppTransportSecurity">
+        <dict>
+          <key>NSAllowsArbitraryLoads</key>
+          <true/>
+        </dict>
+      </config-file>
     </platform>
 </plugin>
