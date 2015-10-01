@@ -8,7 +8,7 @@
 #import "htmlViewerPlugin.h"
 
 @implementation HtmlViewerPlugin{
-    NSMutableDictionary *videoState;
+    UIView *containerView;
     WKWebView *htmlview;
     CADisplayLink *displayLink;
     NSString *startHTML;
@@ -21,8 +21,8 @@
 #pragma mark -
 #pragma mark Cordova Methods
 -(void) pluginInitialize{
-    videoState = [[NSMutableDictionary alloc] init];
-
+    containerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, 0)];
+    
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onSuspend:) name:UIApplicationDidEnterBackgroundNotification object:nil];
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onResume:) name:UIApplicationWillEnterForegroundNotification object:nil];
@@ -41,11 +41,14 @@
     
     loading = false;
     
-    [self.webView.superview insertSubview:htmlview atIndex:0];
+    [self.webView.superview insertSubview:containerView atIndex:0];
+    [containerView insertSubview:htmlview atIndex:0];
+
     self.webView.keyboardDisplayRequiresUserAction = false;
 //    [self.webView.superview addSubview:htmlview];
  
     htmlview.hidden = YES;
+    containerView.hidden = YES;
 
     //displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(animationTick)];
     //displayLink.paused = YES;
@@ -56,12 +59,13 @@
     pendingDomUpdates = [NSMutableArray array];
     
     self.webView.layer.zPosition = 4;
-    htmlview.layer.zPosition = 1;
+    containerView.layer.zPosition = 1;
+    containerView.clipsToBounds = YES;
 }
 
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
    loading = false;
-    [self runJavascript:@"document.documentElement.style.webkitTransformOrigin = '0 0 0';" withTitle:@"setTransformOrigin"];
+    [self runJavascript:@"preloadProgress();" withTitle:@"preloadProgress"];
    [self runDomUpdates];
 }
 
@@ -90,92 +94,109 @@
  ****/
 
 -(void)startSession:(CDVInvokedUrlCommand*)command{
-    int top = [[command.arguments objectAtIndex:2] intValue];
-    int left = [[command.arguments objectAtIndex:3] intValue];
-    int width = [[command.arguments objectAtIndex:4] intValue];
-    int height = [[command.arguments objectAtIndex:5] intValue];
-    env = [command.arguments objectAtIndex:6];
-    
-    htmlview.frame = CGRectMake(left, top, width, height);
+    if (command.arguments.count > 6) {
+        int top = [[command.arguments objectAtIndex:2] intValue];
+        int left = [[command.arguments objectAtIndex:3] intValue];
+        int width = [[command.arguments objectAtIndex:4] intValue];
+        int height = [[command.arguments objectAtIndex:5] intValue];
+        int htmlWidth = [[command.arguments objectAtIndex:6] intValue];
+        int htmlHeight = [[command.arguments objectAtIndex:7] intValue];
+        env = [command.arguments objectAtIndex:8];
+        
+        containerView.frame = CGRectMake(left, top, width, height);
+        htmlview.frame = CGRectMake(0, 0, htmlWidth, htmlHeight);
 
-    htmlview.hidden = NO;
-    
-    htmlview.backgroundColor = [UIColor whiteColor];
-    
-    htmlview.clearsContextBeforeDrawing = YES;
-    htmlview.clipsToBounds = YES;
-    htmlview.multipleTouchEnabled = NO;
-    htmlview.opaque = YES;
-    //htmlview.scalesPageToFit = NO;
-    htmlview.userInteractionEnabled = YES;
+        containerView.hidden = NO;
+        htmlview.hidden = NO;
+        
+        htmlview.backgroundColor = [UIColor whiteColor];
+        
+        htmlview.clearsContextBeforeDrawing = YES;
+        htmlview.clipsToBounds = YES;
+        htmlview.multipleTouchEnabled = NO;
+        htmlview.opaque = YES;
+        //htmlview.scalesPageToFit = NO;
+        htmlview.userInteractionEnabled = YES;
 
-    [self updateHTML:command];
+        [self updateHTML:command];
+    }
+    
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
 -(void)stopSession:(CDVInvokedUrlCommand*)command{
-    [htmlview loadHTMLString:startHTML baseURL:[NSURL URLWithString:@"https://"]];
+    //[htmlview loadHTMLString:startHTML baseURL:[NSURL URLWithString:@"https://"]];
 
     htmlview.hidden = YES;
-    
+    containerView.hidden = YES;
+
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
 - (void)updateView:(CDVInvokedUrlCommand*)command{
-    int top = [[command.arguments objectAtIndex:0] intValue];
-    int left = [[command.arguments objectAtIndex:1] intValue];
-    int width = [[command.arguments objectAtIndex:2] intValue];
-    int height = [[command.arguments objectAtIndex:3] intValue];
-    
-    NSLog(@"%d, %d, %d, %d", left, top, width, height);
-    
-    if (htmlview) {
-        htmlview.frame = CGRectMake(left, top, width, height);
-        [htmlview setNeedsDisplay];
+    if (command.arguments.count > 3) {
+        int top = [[command.arguments objectAtIndex:0] intValue];
+        int left = [[command.arguments objectAtIndex:1] intValue];
+        int width = [[command.arguments objectAtIndex:2] intValue];
+        int height = [[command.arguments objectAtIndex:3] intValue];
+        int htmlWidth = [[command.arguments objectAtIndex:4] intValue];
+        int htmlHeight = [[command.arguments objectAtIndex:5] intValue];
+        
+        if (htmlview) {
+            containerView.frame = CGRectMake(left, top, width, height);
+            htmlview.frame = CGRectMake(0, 0, htmlWidth, htmlHeight);
+            [htmlview setNeedsDisplay];
+        }
     }
-    
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
 - (void)updateInternalView:(CDVInvokedUrlCommand*)command {
-    int scrollX = [[command.arguments objectAtIndex:0] intValue];
-    int scrollY = [[command.arguments objectAtIndex:1] intValue];
-    float scale = [[command.arguments objectAtIndex:2] intValue];
+    if (command.arguments.count > 2) {
+        int scrollX = [[command.arguments objectAtIndex:0] intValue];
+        int scrollY = [[command.arguments objectAtIndex:1] intValue];
+        float scale = [[command.arguments objectAtIndex:2] floatValue];
 
-    if (!loading) {
-        [self runJavascript:[NSString stringWithFormat:@"document.documentElement.style.webkitTransform = 'scale3d(%f, %f, 1) translate3d(%dpx, %dpx, 0px)';", scale, scale, scrollY, scrollX]  withTitle:@"setTransform"];
+        if (!loading) {
+            [self runJavascript:[NSString stringWithFormat:@"document.documentElement.style.webkitTransform = 'scale3d(%f, %f, 1) translate3d(%dpx, %dpx, 0px)';", scale, scale, scrollX, scrollY]  withTitle:@"setTransform"];
+        }
     }
-
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
 
 - (void)updateHTML:(CDVInvokedUrlCommand*)command {
-    NSString* base = [command.arguments objectAtIndex:0];
-    [pendingDomUpdates removeAllObjects];
-    [pendingDomUpdates addObject:[command.arguments objectAtIndex:1]];
+    if (command.arguments.count > 0) {
+        NSString* base = [command.arguments objectAtIndex:0];
+        [pendingDomUpdates removeAllObjects];
+        [pendingDomUpdates addObject:[command.arguments objectAtIndex:1]];
 
-    NSURL *url;
-    if ([base hasPrefix:@"http://"]) {
-       url = [NSURL URLWithString:[NSString stringWithFormat:@"http://%@/mirror.html", env]];
-    } else {
-       url = [NSURL URLWithString:[NSString stringWithFormat:@"https://%@/mirror.html", env]];
+        NSURL *url;
+        if ([base hasPrefix:@"http://"]) {
+           url = [NSURL URLWithString:[NSString stringWithFormat:@"http://%@/mirror.html", env]];
+        } else {
+           url = [NSURL URLWithString:[NSString stringWithFormat:@"https://%@/mirror.html", env]];
+        }
+
+        NSURLRequest *request = [NSURLRequest requestWithURL:url];
+        [htmlview loadRequest:request];
+        loading = true;
     }
-
-    NSURLRequest *request = [NSURLRequest requestWithURL:url];
-    [htmlview loadRequest:request];
-    loading = true;
 
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
 - (void)updateDOM:(CDVInvokedUrlCommand*)command {
-    [pendingDomUpdates addObject:[command.arguments objectAtIndex:0]];
-    if (!loading) {
-        [self runDomUpdates];
+    if (command.arguments.count > 0) {
+        [pendingDomUpdates addObject:[command.arguments objectAtIndex:0]];
+        if (!loading) {
+            [self runDomUpdates];
+        }
     }
     
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
@@ -196,7 +217,7 @@
                 if (result != nil) {
                     NSLog(@"updateDom evaluateJavaScript : %@", [NSString stringWithFormat:@"%@", result]);
                 } else {
-                    NSLog(@"updateDom evaluateJavaScript no result");
+                    //NSLog(@"updateDom evaluateJavaScript no result");
                 }
             } else {
                 NSLog(@"updateDom evaluateJavaScript error : %@", error.localizedDescription);
@@ -207,36 +228,48 @@
 }
 
 - (void)bringToFront:(CDVInvokedUrlCommand*)command {
-    [self.webView.superview bringSubviewToFront:htmlview];
+    [self.webView.superview bringSubviewToFront:containerView];
 }
 
 - (void)sendToBack:(CDVInvokedUrlCommand*)command {
-    [self.webView.superview sendSubviewToBack:htmlview];
+    [self.webView.superview sendSubviewToBack:containerView];
+}
+
+- (void)hideView:(CDVInvokedUrlCommand*)command {
+    htmlview.hidden = YES;
+    containerView.hidden = YES;
+}
+
+- (void)showView:(CDVInvokedUrlCommand*)command {
+    htmlview.hidden = NO;
+    containerView.hidden = NO;
 }
 
 - (void)checkElement:(CDVInvokedUrlCommand*)command {
-    int left = [[command.arguments objectAtIndex:0] intValue];
-    int top = [[command.arguments objectAtIndex:1] intValue];
+    if (command.arguments.count > 1) {
 
-    [htmlview evaluateJavaScript:[NSString stringWithFormat:@"window.document.elementFromPoint(%d, %d).tagName;", left, top] completionHandler:^(id result, NSError *error) {
-        if (error == nil) {
-            if (result != nil) {
-                NSMutableDictionary* payload = [[NSMutableDictionary alloc] init];
-                [payload setObject:result forKey:@"elem"];
-                CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:payload];
-                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-                NSLog(@"evaluateJavaScript : %@", [NSString stringWithFormat:@"%@", result]);
+        int left = [[command.arguments objectAtIndex:0] intValue];
+        int top = [[command.arguments objectAtIndex:1] intValue];
+
+        [htmlview evaluateJavaScript:[NSString stringWithFormat:@"window.document.elementFromPoint(%d, %d).tagName;", left, top] completionHandler:^(id result, NSError *error) {
+            if (error == nil) {
+                if (result != nil) {
+                    NSMutableDictionary* payload = [[NSMutableDictionary alloc] init];
+                    [payload setObject:result forKey:@"elem"];
+                    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:payload];
+                    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+                    NSLog(@"evaluateJavaScript : %@", [NSString stringWithFormat:@"%@", result]);
+                } else {
+                    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
+                    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+                }
             } else {
                 CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
                 [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+                NSLog(@"evaluateJavaScript error : %@", error.localizedDescription);
             }
-        } else {
-            CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
-            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-            NSLog(@"evaluateJavaScript error : %@", error.localizedDescription);
-        }
-    }];
-
+        }];
+    }
 }
 
 - (void)startLoading:(CDVInvokedUrlCommand*)command {
@@ -248,10 +281,14 @@
 }
 
 - (void)sendScroll:(CDVInvokedUrlCommand*)command {
-    int top = [[command.arguments objectAtIndex:0] intValue];
-    
-    [self runJavascript:[NSString stringWithFormat:@"window.scrollTo(0, %d);", top] withTitle:@"sendScroll"];
+    if (command.arguments.count > 2) {
+        int left = [[command.arguments objectAtIndex:0] intValue];
+        int top = [[command.arguments objectAtIndex:1] intValue];
+        float scale = [[command.arguments objectAtIndex:2] floatValue];
 
+        [self runJavascript:[NSString stringWithFormat:@"window.scrollTo(%d, %d);document.documentElement.style.webkitTransformOrigin = '%fpx %fpx'; ", left, top, left/scale, top/scale] withTitle:@"sendScroll"];
+    }
+    
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }

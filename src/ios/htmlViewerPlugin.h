@@ -22,5 +22,7 @@
 - (void)sendScroll:(CDVInvokedUrlCommand*)command;
 - (void)checkElement:(CDVInvokedUrlCommand*)command;
 - (void)startLoading:(CDVInvokedUrlCommand*)command;
+- (void)hideView:(CDVInvokedUrlCommand*)command;
+- (void)showView:(CDVInvokedUrlCommand*)command;
 
 @end

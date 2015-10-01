@@ -10,29 +10,38 @@ window.SSHtmlViewer = {
   localscrollleft: 0,
   canvasleft:0,
   canvastop:98,
+  panleft:0,
+  pantop:0,
   scale:1,
   internalScrollX: 0,
   internalScrollY: 0,
   internalScale: 1,
+  viewer: false,
 
+  setViewer: function(v) {
+    SSHtmlViewer.viewer = v;
+  },
   startSession: function(msg, env, cb) {
-    var top = (SSHtmlViewer.top - SSHtmlViewer.scrolltop) * SSHtmlViewer.scale + SSHtmlViewer.localscrolltop + SSHtmlViewer.canvastop;
-    var left = (SSHtmlViewer.left - SSHtmlViewer.scrollleft) * SSHtmlViewer.scale + SSHtmlViewer.localscrollleft + SSHtmlViewer.canvasleft;
+    var top = (SSHtmlViewer.top - SSHtmlViewer.scrolltop) * SSHtmlViewer.scale + SSHtmlViewer.localscrolltop + SSHtmlViewer.canvastop + SSHtmlViewer.pantop;
+    var left = (SSHtmlViewer.left - SSHtmlViewer.scrollleft) * SSHtmlViewer.scale + SSHtmlViewer.localscrollleft + SSHtmlViewer.canvasleft + SSHtmlViewer.panleft;
     var width = SSHtmlViewer.width * SSHtmlViewer.scale;
     var height = SSHtmlViewer.height * SSHtmlViewer.scale;
+    var htmlWidth = SSHtmlViewer.width * SSHtmlViewer.scale;
+    var htmlHeight = SSHtmlViewer.height * SSHtmlViewer.scale;
 
-    console.log('width', SSHtmlViewer.width * SSHtmlViewer.scale, SSHtmlViewer.width, SSHtmlViewer.scale);
-
+    console.log('setting html view', top, left, width, height, htmlWidth, htmlHeight);
     if (cb) {
-      Cordova.exec(cb, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [msg.base, msg, top, left, width, height, env]);
+      Cordova.exec(cb, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [msg.base, msg, top, left, width, height, htmlWidth, htmlHeight, env]);
     } else {
-      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [msg.base, msg, top, left, width, height, env]);
+      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [msg.base, msg, top, left, width, height, htmlWidth, htmlHeight, env]);
     }
     var ele = document.body;
     ele.className = ele.className.trim() + ' transparent';
     ele.style.backgroundColor = 'rgba(0,0,0,0)';
 
     SSHtmlViewer.browserStart = true;
+
+    window.speedshare.send('web#transparent', {});
 
     setTimeout(function() {
       var div = document.createElement("div");
@@ -42,7 +51,6 @@ window.SSHtmlViewer = {
       setTimeout(function() {
         window.document.body.removeChild(div);
       }, 100);
-      window.speedshare.send('web#transparent', {});
     }, 2000);
   },
   stopSession: function() {
@@ -57,17 +65,27 @@ window.SSHtmlViewer = {
     if (SSHtmlViewer.browserStart) {
       //var top = (SSHtmlViewer.top - SSHtmlViewer.scrolltop) * SSHtmlViewer.scale + SSHtmlViewer.localscrolltop + SSHtmlViewer.canvastop;
       //var left = (SSHtmlViewer.left - SSHtmlViewer.scrollleft) * SSHtmlViewer.scale + SSHtmlViewer.localscrollleft + SSHtmlViewer.canvasleft;
-      var top = (SSHtmlViewer.top) * SSHtmlViewer.scale + SSHtmlViewer.localscrolltop + SSHtmlViewer.canvastop;
-      var left = (SSHtmlViewer.left) * SSHtmlViewer.scale + SSHtmlViewer.localscrollleft + SSHtmlViewer.canvasleft;
-      var width = SSHtmlViewer.width * SSHtmlViewer.scale;
-      var height = SSHtmlViewer.height * SSHtmlViewer.scale;
+      var top = SSHtmlViewer.top  + SSHtmlViewer.localscrolltop + SSHtmlViewer.canvastop + SSHtmlViewer.pantop;
+      var left = SSHtmlViewer.left + SSHtmlViewer.localscrollleft + SSHtmlViewer.canvasleft + SSHtmlViewer.panleft;
+      var width = SSHtmlViewer.width;
+      var height = SSHtmlViewer.height;
+      var htmlWidth = SSHtmlViewer.width / SSHtmlViewer.scale;
+      var htmlHeight = SSHtmlViewer.height / SSHtmlViewer.scale;
 
-      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateView', [top, left, width, height]);
+      console.log('setting html view', top, left, width, height, htmlWidth, htmlHeight);
+
+      //console.log('updating web view left', left, SSHtmlViewer.left, SSHtmlViewer.localscrollleft, SSHtmlViewer.canvasleft, SSHtmlViewer.panleft);
+
+      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateView', [top, left, width, height, htmlWidth, htmlHeight]);
     }
   },
   updateInternalView: function() {
     if (SSHtmlViewer.browserStart) {
-      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateInternalView', [(SSHtmlViewer.internalScrollX / SSHtmlViewer.internalScale), (SSHtmlViewer.internalScrollY / SSHtmlViewer.internalScale), SSHtmlViewer.internalScale]);
+      var scrollTop = (SSHtmlViewer.internalScrollY / SSHtmlViewer.internalScale ) - ((SSHtmlViewer.height/SSHtmlViewer.scale)-SSHtmlViewer.height)/2;
+      var scrollLeft = (SSHtmlViewer.internalScrollX / SSHtmlViewer.internalScale ) - ((SSHtmlViewer.width/SSHtmlViewer.scale)-SSHtmlViewer.width)/2/SSHtmlViewer.scale;
+
+      console.log(scrollTop, SSHtmlViewer.internalScrollY, SSHtmlViewer.internalScale, SSHtmlViewer.websharescrolltop);
+      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateInternalView', [scrollLeft, scrollTop, SSHtmlViewer.internalScale]);
     }    
   },
   updateHTML: function(msg) {
@@ -77,6 +95,16 @@ window.SSHtmlViewer = {
       } else {
         Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateDOM', [msg]);
       }
+    }
+  },
+  hideView: function() {
+    if (SSHtmlViewer.browserStart) {
+      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'hideView', []);
+    }
+  },
+  showView: function() {
+    if (SSHtmlViewer.browserStart) {
+      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'showView', []);
     }
   },
   checkElement: function(x,y,cb) {
@@ -89,6 +117,12 @@ window.SSHtmlViewer = {
       Cordova.exec(cb, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startLoading', []);
     }
   },
+  bringToFront: function() {
+    Cordova.exec(SSVideo.SSVideoSuccess, SSVideo.SSVideoError, 'HtmlViewerPlugin', 'bringToFront', []);
+  },
+  sendToBack: function() {
+    Cordova.exec(SSVideo.SSVideoSuccess, SSVideo.SSVideoError, 'HtmlViewerPlugin', 'bringToFront', []);
+  },
   SSHTMLSuccess: function(data) {
     //console.log('SSHTMLSuccess', data);
   },
@@ -99,43 +133,62 @@ window.SSHtmlViewer = {
     speedshare.on('remote#dom', function(type, data){
       //SSHtmlViewer.height = data.height;
       //debugger;
-      if (!SSHtmlViewer.browserStart) {
-        var env = localStorage.envSync.replace('https://', '').replace('http://', '');
-        window.SSHtmlViewer.startSession(data.html, env);
-        window.SSHtmlViewer.startLoading();
-      } else {
-        window.SSHtmlViewer.updateHTML(data.html);
+      if (!SSHtmlViewer.viewer) {
+        if (!SSHtmlViewer.browserStart) {
+          var env = localStorage.envSync.replace('https://', '').replace('http://', '');
+          window.SSHtmlViewer.startSession(data.html, env);
+          window.SSHtmlViewer.startLoading();
+        } else {
+          window.SSHtmlViewer.updateHTML(data.html);
+        }
       }
     });
     speedshare.on('canvas#position', function(type, data){
       SSHtmlViewer.localscrolltop = data.top;
-      window.SSHtmlViewer.updateView();
+      if (!SSHtmlViewer.viewer && SSHtmlViewer.browserStart) {
+        window.SSHtmlViewer.updateView();
+      }
     });
     speedshare.on('tabs#loading', function(type, data){
-      window.SSHtmlViewer.startLoading();
+      if (!SSHtmlViewer.viewer && SSHtmlViewer.browserStart) {
+        window.SSHtmlViewer.startLoading();
+      }
     });
-
+    speedshare.on('remote#playVideo', function(type, data){
+      window.SSHtmlViewer.hideView();
+    });
+    speedshare.on('remote#pauseVideo', function(type, data){
+      window.SSHtmlViewer.showView();
+    });
     speedshare.on('canvas#resize', function(type, data){
-      console.log('canvas#resize', data);
-      // the plus 64 is to account for the 20px iOS status bar and the 44px header above the video
       SSHtmlViewer.scale = data.initScale;
+      if (!data.initScale) {
+        SSHtmlViewer.scale = 1;
+      }
       SSHtmlViewer.width = data.width;
       SSHtmlViewer.height = data.height;
       SSHtmlViewer.internalScrollX = data.internalScrollX;
       SSHtmlViewer.internalScrollY = data.internalScrollY;
       SSHtmlViewer.internalScale = data.scale;
-      window.SSHtmlViewer.updateView();
-      window.SSHtmlViewer.updateInternalView();
+      SSHtmlViewer.top = data.top;
+      SSHtmlViewer.left = data.left;
+      if (!SSHtmlViewer.viewer && SSHtmlViewer.browserStart) {
+        window.SSHtmlViewer.updateView();
+        window.SSHtmlViewer.updateInternalView();
+      }
     });
     speedshare.on('window#scrolling', function(type, data){
-      SSHtmlViewer.scrolltop = data.y;
-      //if (data.animate) {
-        //var top = (SSHtmlViewer.top - SSHtmlViewer.scrolltop) * SSHtmlViewer.scale + SSHtmlViewer.localscrolltop + SSHtmlViewer.canvastop;
-      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'sendScroll', [SSHtmlViewer.scrolltop]);
-      //} else {
-        //SSHtmlViewer.scrolltop = data.y;
-        //window.SSHtmlViewer.updateView();
-      //}
+      if (!SSHtmlViewer.viewer && SSHtmlViewer.browserStart) {
+        SSHtmlViewer.scrolltop = data.y;
+        SSHtmlViewer.scrollleft = data.x;
+        //if (data.animate) {
+          //var top = (SSHtmlViewer.top - SSHtmlViewer.scrolltop) * SSHtmlViewer.scale + SSHtmlViewer.localscrolltop + SSHtmlViewer.canvastop;
+        Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'sendScroll', [SSHtmlViewer.scrollleft, SSHtmlViewer.scrolltop, SSHtmlViewer.internalScale]);
+        //} else {
+          //SSHtmlViewer.scrolltop = data.y;
+          //window.SSHtmlViewer.updateView();
+        //}        
+      }
     });
     window.speedshare.on('connect#stop', function(type, data){
       window.SSHtmlViewer.stopSession();
