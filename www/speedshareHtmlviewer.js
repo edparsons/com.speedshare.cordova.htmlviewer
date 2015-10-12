@@ -21,7 +21,7 @@ window.SSHtmlViewer = {
   setViewer: function(v) {
     SSHtmlViewer.viewer = v;
   },
-  startSession: function(msg, env, cb) {
+  startSession: function(cb) {
     var top = (SSHtmlViewer.top - SSHtmlViewer.scrolltop) * SSHtmlViewer.scale + SSHtmlViewer.localscrolltop + SSHtmlViewer.canvastop + SSHtmlViewer.pantop;
     var left = (SSHtmlViewer.left - SSHtmlViewer.scrollleft) * SSHtmlViewer.scale + SSHtmlViewer.localscrollleft + SSHtmlViewer.canvasleft + SSHtmlViewer.panleft;
     var width = SSHtmlViewer.width * SSHtmlViewer.scale;
@@ -29,11 +29,10 @@ window.SSHtmlViewer = {
     var htmlWidth = SSHtmlViewer.width * SSHtmlViewer.scale;
     var htmlHeight = SSHtmlViewer.height * SSHtmlViewer.scale;
 
-    console.log('setting html view', top, left, width, height, htmlWidth, htmlHeight);
     if (cb) {
-      Cordova.exec(cb, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [msg.base, msg, top, left, width, height, htmlWidth, htmlHeight, env]);
+      Cordova.exec(cb, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [top, left, width, height, htmlWidth, htmlHeight, SSHtmlViewer.env]);
     } else {
-      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [msg.base, msg, top, left, width, height, htmlWidth, htmlHeight, env]);
+      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [top, left, width, height, htmlWidth, htmlHeight, SSHtmlViewer.env]);
     }
     var ele = document.body;
     ele.className = ele.className.trim() + ' transparent';
@@ -72,10 +71,6 @@ window.SSHtmlViewer = {
       var htmlWidth = SSHtmlViewer.width / SSHtmlViewer.scale;
       var htmlHeight = SSHtmlViewer.height / SSHtmlViewer.scale;
 
-      console.log('setting html view', top, left, width, height, htmlWidth, htmlHeight);
-
-      //console.log('updating web view left', left, SSHtmlViewer.left, SSHtmlViewer.localscrollleft, SSHtmlViewer.canvasleft, SSHtmlViewer.panleft);
-
       Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateView', [top, left, width, height, htmlWidth, htmlHeight]);
     }
   },
@@ -84,13 +79,13 @@ window.SSHtmlViewer = {
       var scrollTop = (SSHtmlViewer.internalScrollY / SSHtmlViewer.internalScale ) - ((SSHtmlViewer.height/SSHtmlViewer.scale)-SSHtmlViewer.height)/2;
       var scrollLeft = (SSHtmlViewer.internalScrollX / SSHtmlViewer.internalScale ) - ((SSHtmlViewer.width/SSHtmlViewer.scale)-SSHtmlViewer.width)/2/SSHtmlViewer.scale;
 
-      console.log(scrollTop, SSHtmlViewer.internalScrollY, SSHtmlViewer.internalScale, SSHtmlViewer.websharescrolltop);
       Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateInternalView', [scrollLeft, scrollTop, SSHtmlViewer.internalScale]);
     }    
   },
   updateHTML: function(msg) {
     if (SSHtmlViewer.browserStart) {
       if (msg.base) {
+        SSHtmlViewer.base = msg.base;
         Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateHTML', [msg.base, msg]);
       } else {
         Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateDOM', [msg]);
@@ -129,20 +124,17 @@ window.SSHtmlViewer = {
   SSHTMLError: function(data) {
     console.log('SSHTMLError', data);
   },
-  attachListeners: function(speedshare) {
+  attachListeners: function(speedshare, env, viewer) {
+    window.SSHtmlViewer.env = env;
+
     speedshare.on('remote#dom', function(type, data){
       //SSHtmlViewer.height = data.height;
       //debugger;
       if (!SSHtmlViewer.viewer) {
-        if (!SSHtmlViewer.browserStart) {
-          var env = localStorage.envSync.replace('https://', '').replace('http://', '');
-          window.SSHtmlViewer.startSession(data.html, env);
-          window.SSHtmlViewer.startLoading();
-        } else {
-          window.SSHtmlViewer.updateHTML(data.html);
-        }
+        window.SSHtmlViewer.updateHTML(data.html);
       }
     });
+
     speedshare.on('canvas#position', function(type, data){
       SSHtmlViewer.localscrolltop = data.top;
       if (!SSHtmlViewer.viewer && SSHtmlViewer.browserStart) {
@@ -175,6 +167,9 @@ window.SSHtmlViewer = {
       if (!SSHtmlViewer.viewer && SSHtmlViewer.browserStart) {
         window.SSHtmlViewer.updateView();
         window.SSHtmlViewer.updateInternalView();
+      }
+      if (!SSHtmlViewer.browserStart && !SSHtmlViewer.viewer) {
+        window.SSHtmlViewer.startSession();      
       }
     });
     speedshare.on('window#scrolling', function(type, data){
