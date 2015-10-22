@@ -17,7 +17,11 @@ window.SSHtmlViewer = {
   internalScrollY: 0,
   internalScale: 1,
   viewer: false,
+  madeTransparent: false,
 
+  init: function(v) {
+    Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'init', []);
+  },
   setViewer: function(v) {
     SSHtmlViewer.viewer = v;
   },
@@ -29,28 +33,14 @@ window.SSHtmlViewer = {
     var htmlWidth = SSHtmlViewer.width * SSHtmlViewer.scale;
     var htmlHeight = SSHtmlViewer.height * SSHtmlViewer.scale;
 
+    SSHtmlViewer.runTransparentCode();
+    SSHtmlViewer.browserStart = true;
+
     if (cb) {
       Cordova.exec(cb, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [top, left, width, height, htmlWidth, htmlHeight, SSHtmlViewer.env]);
     } else {
       Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [top, left, width, height, htmlWidth, htmlHeight, SSHtmlViewer.env]);
     }
-    var ele = document.body;
-    ele.className = ele.className.trim() + ' transparent';
-    ele.style.backgroundColor = 'rgba(0,0,0,0)';
-
-    SSHtmlViewer.browserStart = true;
-
-    window.speedshare.send('web#transparent', {});
-
-    setTimeout(function() {
-      var div = document.createElement("div");
-      div.className = 'modal-backdrop';
-      div.setAttribute('id', 'shockRepaint');
-      window.document.body.appendChild(div);
-      setTimeout(function() {
-        window.document.body.removeChild(div);
-      }, 100);
-    }, 2000);
   },
   stopSession: function() {
     Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'stopSession', []);
@@ -113,20 +103,46 @@ window.SSHtmlViewer = {
     }
   },
   bringToFront: function() {
-    Cordova.exec(SSVideo.SSVideoSuccess, SSVideo.SSVideoError, 'HtmlViewerPlugin', 'bringToFront', []);
+    Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'bringToFront', []);
   },
   sendToBack: function() {
-    Cordova.exec(SSVideo.SSVideoSuccess, SSVideo.SSVideoError, 'HtmlViewerPlugin', 'bringToFront', []);
+    Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'bringToFront', []);
+  },
+  setRavenConfig: function(version, deployment, link, sessionId, clientId, syncServer, viewer) {
+    Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'ravenSetup', [version, deployment, link, sessionId, clientId, syncServer, JSON.stringify(viewer)]);
+  },
+  runTransparentCode: function() {
+    var ele = document.body;
+    ele.className = ele.className.trim() + ' transparent';
+    ele.style.backgroundColor = 'transparent';
+
+    window.speedshare.send('web#transparent', {});
+
+    setTimeout(function() {
+      var div = document.createElement("div");
+      div.className = 'modal-backdrop';
+      div.setAttribute('id', 'shockRepaint');
+      window.document.body.appendChild(div);
+      setTimeout(function() {
+        window.document.body.removeChild(div);
+      }, 100);
+    }, 2000);
   },
   SSHTMLSuccess: function(data) {
     //console.log('SSHTMLSuccess', data);
   },
   SSHTMLError: function(data) {
-    console.log('SSHTMLError', data);
+    throw new Error('SSHtmlPlugin: '+JSON.stringify(data));
   },
-  attachListeners: function(speedshare, env, viewer) {
-    window.SSHtmlViewer.env = env;
-
+  setup: function(env, syncServer, viewer, sessionId, clientId, link) {
+    window.SSHtmlViewer.env = syncServer.replace('http://','').replace('https://','');
+    window.SSHtmlViewer.startSession();
+    window.SSHtmlViewer.setRavenConfig(window.SpeedshareAPI.version, env, link, sessionId, clientId, syncServer, viewer);
+  },
+  fakeCrash: function() {
+    Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'fakeCrash', []);
+  },
+  attachListeners: function(speedshare) {
     speedshare.on('remote#dom', function(type, data){
       //SSHtmlViewer.height = data.height;
       //debugger;
@@ -153,6 +169,10 @@ window.SSHtmlViewer = {
       window.SSHtmlViewer.showView();
     });
     speedshare.on('canvas#resize', function(type, data){
+      if (!SSHtmlViewer.madeTransparent) {
+        SSHtmlViewer.runTransparentCode();
+        SSHtmlViewer.madeTransparent = true;
+      }
       SSHtmlViewer.scale = data.initScale;
       if (!data.initScale) {
         SSHtmlViewer.scale = 1;
@@ -164,12 +184,12 @@ window.SSHtmlViewer = {
       SSHtmlViewer.internalScale = data.scale;
       SSHtmlViewer.top = data.top;
       SSHtmlViewer.left = data.left;
+      if (!SSHtmlViewer.browserStart && !SSHtmlViewer.viewer) {
+        window.SSHtmlViewer.startSession();      
+      }
       if (!SSHtmlViewer.viewer && SSHtmlViewer.browserStart) {
         window.SSHtmlViewer.updateView();
         window.SSHtmlViewer.updateInternalView();
-      }
-      if (!SSHtmlViewer.browserStart && !SSHtmlViewer.viewer) {
-        window.SSHtmlViewer.startSession();      
       }
     });
     speedshare.on('window#scrolling', function(type, data){
@@ -187,6 +207,7 @@ window.SSHtmlViewer = {
     });
     window.speedshare.on('connect#stop', function(type, data){
       window.SSHtmlViewer.stopSession();
+      SSHtmlViewer.madeTransparent = false;
     });
   }
 };
