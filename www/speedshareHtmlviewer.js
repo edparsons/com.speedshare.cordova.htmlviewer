@@ -16,14 +16,11 @@ window.SSHtmlViewer = {
   internalScrollX: 0,
   internalScrollY: 0,
   internalScale: 1,
-  viewer: false,
+  viewer: true,
   madeTransparent: false,
 
   init: function(v) {
     Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'init', []);
-  },
-  setViewer: function(v) {
-    SSHtmlViewer.viewer = v;
   },
   startSession: function(cb) {
     var top = (SSHtmlViewer.top - SSHtmlViewer.scrolltop) * SSHtmlViewer.scale + SSHtmlViewer.localscrolltop + SSHtmlViewer.canvastop + SSHtmlViewer.pantop;
@@ -37,9 +34,9 @@ window.SSHtmlViewer = {
     SSHtmlViewer.browserStart = true;
 
     if (cb) {
-      Cordova.exec(cb, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [top, left, width, height, htmlWidth, htmlHeight, SSHtmlViewer.env]);
+      Cordova.exec(cb, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [top, left, width, height, htmlWidth, htmlHeight]);
     } else {
-      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [top, left, width, height, htmlWidth, htmlHeight, SSHtmlViewer.env]);
+      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'startSession', [top, left, width, height, htmlWidth, htmlHeight]);
     }
   },
   stopSession: function() {
@@ -66,10 +63,10 @@ window.SSHtmlViewer = {
   },
   updateInternalView: function() {
     if (SSHtmlViewer.browserStart) {
-      var scrollTop = (SSHtmlViewer.internalScrollY / SSHtmlViewer.internalScale ) - ((SSHtmlViewer.height/SSHtmlViewer.scale)-SSHtmlViewer.height)/2;
-      var scrollLeft = (SSHtmlViewer.internalScrollX / SSHtmlViewer.internalScale ) - ((SSHtmlViewer.width/SSHtmlViewer.scale)-SSHtmlViewer.width)/2/SSHtmlViewer.scale;
+      //var scrollTop = (SSHtmlViewer.internalScrollY / SSHtmlViewer.internalScale ) - ((SSHtmlViewer.height/SSHtmlViewer.scale)-SSHtmlViewer.height)/2;
+      //var scrollLeft = (SSHtmlViewer.internalScrollX / SSHtmlViewer.internalScale ) - ((SSHtmlViewer.width/SSHtmlViewer.scale)-SSHtmlViewer.width)/2/SSHtmlViewer.scale;
 
-      Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateInternalView', [scrollLeft, scrollTop, SSHtmlViewer.internalScale]);
+      //Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'updateInternalView', [SSHtmlViewer.internalScale]);
     }    
   },
   updateHTML: function(msg) {
@@ -108,8 +105,8 @@ window.SSHtmlViewer = {
   sendToBack: function() {
     Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'bringToFront', []);
   },
-  setRavenConfig: function(version, deployment, link, sessionId, clientId, syncServer, viewer) {
-    Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'ravenSetup', [version, deployment, link, sessionId, clientId, syncServer, JSON.stringify(viewer)]);
+  setRavenConfig: function(env, version, deployment, link, sessionId, clientId, syncServer, viewer) {
+    Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'ravenSetup', [env, version, deployment, link, sessionId, clientId, syncServer, JSON.stringify(viewer)]);
   },
   runTransparentCode: function() {
     var ele = document.body;
@@ -134,13 +131,19 @@ window.SSHtmlViewer = {
   SSHTMLError: function(data) {
     throw new Error('SSHtmlPlugin: '+JSON.stringify(data));
   },
-  setup: function(env, syncServer, viewer, sessionId, clientId, link) {
+  setup: function(env, syncServer, viewer, sessionId, clientId, link, v) {
     window.SSHtmlViewer.env = syncServer.replace('http://','').replace('https://','');
-    window.SSHtmlViewer.startSession();
-    window.SSHtmlViewer.setRavenConfig(window.SpeedshareAPI.version, env, link, sessionId, clientId, syncServer, viewer);
+    window.SSHtmlViewer.setRavenConfig(window.SSHtmlViewer.env, window.SpeedshareAPI.version, env, link, sessionId, clientId, syncServer, viewer);
+    window.SSHtmlViewer.viewer = v;
+    if (!SSHtmlViewer.viewer) {
+      window.SSHtmlViewer.startSession();
+    }
   },
   fakeCrash: function() {
     Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'fakeCrash', []);
+  },
+  setupCrashlytics: function(identifier) {
+    Cordova.exec(SSHtmlViewer.SSHTMLSuccess, SSHtmlViewer.SSHTMLError, 'HtmlViewerPlugin', 'setCrashlytics', [identifier]);
   },
   attachListeners: function(speedshare) {
     speedshare.on('remote#dom', function(type, data){

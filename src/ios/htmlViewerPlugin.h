@@ -26,6 +26,7 @@
 - (void)showView:(CDVInvokedUrlCommand*)command;
 - (void)ravenSetup:(CDVInvokedUrlCommand*)command;
 - (void)fakeCrash:(CDVInvokedUrlCommand*)command;
+- (void)setCrashlytics:(CDVInvokedUrlCommand*)command;
 - (void)init:(CDVInvokedUrlCommand*)command;
 
 @end

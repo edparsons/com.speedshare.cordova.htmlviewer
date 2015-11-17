@@ -86,7 +86,7 @@
 
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
    loading = false;
-    [self runJavascript:@"preloadProgress();" withTitle:@"preloadProgress"];
+    [self runJavascript:@"if (typeof preloadProgress === 'function') { preloadProgress(); }" withTitle:@"preloadProgress"];
    [self runDomUpdates];
 }
 
@@ -115,29 +115,35 @@
  ****/
 
 -(void)ravenSetup:(CDVInvokedUrlCommand*)command{
-    if ([self checkArguments:command withTemplate:@[@"s",@"s",@"s",@"s",@"s",@"s",@"s"]]) {
-        version = [command.arguments objectAtIndex:0];
-        deployment = [command.arguments objectAtIndex:1];
-        link = [command.arguments objectAtIndex:2];
-        sessionId = [command.arguments objectAtIndex:3];
-        clientId = [command.arguments objectAtIndex:4];
-        syncServer = [command.arguments objectAtIndex:5];
-        viewer = [command.arguments objectAtIndex:6];
+    if ([self checkArguments:command withTemplate:@[@"s",@"s",@"s",@"s",@"s",@"s",@"s",@"s"]]) {
+        env = [command.arguments objectAtIndex:0];
+        version = [command.arguments objectAtIndex:1];
+        deployment = [command.arguments objectAtIndex:2];
+        link = [command.arguments objectAtIndex:3];
+        sessionId = [command.arguments objectAtIndex:4];
+        clientId = [command.arguments objectAtIndex:5];
+        syncServer = [command.arguments objectAtIndex:6];
+        viewer = [command.arguments objectAtIndex:7];
         
+        NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"https://%@/mirror.html?version=%@#deployment=%@&link=%@&sessionId=%@&clientId=%@&syncServer=%@&viewer=%@", env, version, deployment, link, sessionId, clientId, syncServer, viewer]];
+
+        NSURLRequest *request = [NSURLRequest requestWithURL:url];
+        [htmlview loadRequest:request];
+        loading = true;
+
         CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }
 }
 
 -(void)startSession:(CDVInvokedUrlCommand*)command{
-    if ([self checkArguments:command withTemplate:@[@"n",@"n",@"n",@"n",@"n",@"n",@"s"]]) {
+    if ([self checkArguments:command withTemplate:@[@"n",@"n",@"n",@"n",@"n",@"n"]]) {
         int top = [[command.arguments objectAtIndex:0] intValue];
         int left = [[command.arguments objectAtIndex:1] intValue];
         int width = [[command.arguments objectAtIndex:2] intValue];
         int height = [[command.arguments objectAtIndex:3] intValue];
         int htmlWidth = [[command.arguments objectAtIndex:4] intValue];
         int htmlHeight = [[command.arguments objectAtIndex:5] intValue];
-        env = [command.arguments objectAtIndex:6];
         
         containerView.frame = CGRectMake(left, top, width, height);
         htmlview.frame = CGRectMake(0, 0, htmlWidth, htmlHeight);
@@ -156,7 +162,7 @@
         htmlview.opaque = YES;
         //htmlview.scalesPageToFit = NO;
         htmlview.userInteractionEnabled = NO;
-
+        
         CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }
@@ -217,8 +223,6 @@
         [pendingDomUpdates removeAllObjects];
         [pendingDomUpdates addObject:[command.arguments objectAtIndex:1]];
         
-        [[NSURLCache sharedURLCache] removeAllCachedResponses];
-
         NSURL *url;
         if ([base hasPrefix:@"http://"]) {
            url = [NSURL URLWithString:[NSString stringWithFormat:@"http://%@/mirror.html?version=%@#deployment=%@&link=%@&sessionId=%@&clientId=%@&syncServer=%@&viewer=%@", env, version, deployment, link, sessionId, clientId, syncServer, viewer]];
@@ -329,7 +333,7 @@
         int top = [[command.arguments objectAtIndex:1] intValue];
         float scale = [[command.arguments objectAtIndex:2] floatValue];
 
-        [self runJavascript:[NSString stringWithFormat:@"window.scrollTo(%d, %d);document.documentElement.style.webkitTransformOrigin = '%fpx %fpx'; ", left, top, left/scale, top/scale] withTitle:@"sendScroll"];
+        [self runJavascript:[NSString stringWithFormat:@"_ss_setScroll(%d,%d,%f,%f)", left, top, left/scale, top/scale] withTitle:@"sendScroll"];
 
         CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
@@ -381,6 +385,9 @@
 
 - (void)fakeCrash:(CDVInvokedUrlCommand*)command {
     [[Crashlytics sharedInstance] crash];
+}
+-(void)setCrashlytics:(CDVInvokedUrlCommand*)command{
+    [[Crashlytics sharedInstance] setUserIdentifier:[command.arguments objectAtIndex:0]];
 }
 
 
